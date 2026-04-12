@@ -282,15 +282,20 @@ function currentStreak(streak){
 
 function winPct(w,total){ return total?Math.round(w/total*100):0; }
 
-// Orden: 1º victorias, 2º % victorias (victorias/partidos jugados), 3º partidos jugados
+// Orden estilo NBA:
+// 1. No puedes ir por delante de quien ha jugado más partidos que tú
+// 2. Mismos partidos: mayor % de victorias
+// 3. Mismas victorias: mayor % de games ganados (gw/(gw+gl))
+function gamePct(gw,gl){ const t=gw+gl; return t?gw/t:0; }
 function rankPlayers(ps){
   return Object.entries(ps)
     .map(([name,s])=>({name,...s,total:s.w+s.l+s.d}))
     .sort((a,b)=>{
-      if(b.w!==a.w) return b.w-a.w;
+      if(a.total < b.total) return 1;
+      if(b.total < a.total) return -1;
       const pa=winPct(a.w,a.total), pb=winPct(b.w,b.total);
       if(pb!==pa) return pb-pa;
-      return b.total-a.total;
+      return gamePct(b.gw,b.gl)-gamePct(a.gw,a.gl);
     });
 }
 
@@ -298,10 +303,11 @@ function rankPairs(pairs){
   return Object.values(pairs)
     .map(p=>({...p,total:p.w+p.l+p.d}))
     .sort((a,b)=>{
-      if(b.w!==a.w) return b.w-a.w;
+      if(a.total < b.total) return 1;
+      if(b.total < a.total) return -1;
       const pa=winPct(a.w,a.total), pb=winPct(b.w,b.total);
       if(pb!==pa) return pb-pa;
-      return b.total-a.total;
+      return (b.w-b.l)-(a.w-a.l);
     });
 }
 
