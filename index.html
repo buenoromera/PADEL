@@ -237,15 +237,27 @@ function calcStats(){
     const teams=[[t1p1,t1p2],[t2p1,t2p2]];
     const res=[s1>s2?'w':s1<s2?'l':'d', s1>s2?'l':s1<s2?'w':'d'];
 
+    // Calcular games reales desde el marcador exacto
+    let gamesT1=0, gamesT2=0;
+    if(score){
+      score.split('/').forEach(set=>{
+        const parts=set.trim().split('-');
+        if(parts.length===2){
+          gamesT1+=parseInt(parts[0])||0;
+          gamesT2+=parseInt(parts[1])||0;
+        }
+      });
+    }
+
     teams.forEach((team,ti)=>{
       const r=res[ti];
       team.forEach(p=>{
         if(!ps[p]) ps[p]={w:0,l:0,d:0,gw:0,gl:0,lastMatch:null,streak:[]};
         ps[p][r]++;
         ps[p].streak.push(r);
-        // juegos ganados/perdidos (sets individuales)
-        ps[p].gw += ti===0?parseInt(s1):parseInt(s2);
-        ps[p].gl += ti===0?parseInt(s2):parseInt(s1);
+        // juegos ganados/perdidos desde marcador exacto
+        ps[p].gw += ti===0?gamesT1:gamesT2;
+        ps[p].gl += ti===0?gamesT2:gamesT1;
         const opp=ti===0?[t2p1,t2p2]:[t1p1,t1p2];
         const partner=team.find(x=>x!==p);
         if(!ps[p].lastMatch||date>ps[p].lastMatch.date){
