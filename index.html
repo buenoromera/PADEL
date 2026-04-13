@@ -83,7 +83,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;letter-spacing:.5px;vertical-align:middle;margin-left:8px}
 .badge-w{background:rgba(82,183,136,0.2);color:var(--win);border:1px solid rgba(82,183,136,0.3)}
 .badge-l{background:rgba(231,111,81,0.15);color:var(--loss);border:1px solid rgba(231,111,81,0.3)}
-.badge-d{background:rgba(244,208,63,0.15);color:var(--draw);border:1px solid rgba(244,208,63,0.3)}
+.badge-d{background:rgba(244,208,63,0.15);color:var(--draw);border:1px solid rgba(244,208,63,0.2)}
 .tabla{width:100%;border-collapse:collapse;font-size:12px}
 .tabla th{padding:8px 6px;color:var(--text3);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:1px;text-align:left;border-bottom:1px solid var(--border)}
 .tabla td{padding:10px 6px;border-bottom:1px solid var(--border)}
@@ -259,7 +259,7 @@ function calcStats(){
         ps[p].gl += g_loss;
         const opp=ti===0?[t2p1,t2p2]:[t1p1,t1p2];
         const partner=team.find(x=>x!==p);
-        if(!ps[p].lastMatch||date>ps[p].lastMatch.date){
+        if(!ps[p].lastMatch||date>=ps[p].lastMatch.date){
           ps[p].lastMatch={date,partner,opp1:opp[0],opp2:opp[1],score:score||(s1+'-'+s2),res:r,location:location||''};
         }
       });
@@ -354,22 +354,16 @@ function calcMonthStats(){
   return{mvp,worst};
 }
 
-// ── LÓGICA DE OTRA MITAD / PUNTO DÉBIL ──────────────────
 function getAffinities(user){
   const {pairs}=calcStats();
   const myPairs = Object.values(pairs).filter(p => p.p1 === user || p.p2 === user);
   if(!myPairs.length) return {best:null, worst:null};
-
   const scores = myPairs.map(p => {
     const partner = p.p1 === user ? p.p2 : p.p1;
     return { name: partner, w: p.w, l: p.l, d: p.d, gw: p.gw, gl: p.gl, diff: p.gw - p.gl, total: p.w+p.l+p.d };
   });
-
-  // Mejor pareja: Más victorias -> Mejor diferencia juegos
   const best = [...scores].sort((a,b) => b.w - a.w || b.diff - a.diff)[0];
-  // Peor pareja: Más derrotas -> Peor diferencia juegos
   const worst = [...scores].sort((a,b) => b.l - a.l || a.diff - b.diff)[0];
-
   return { best, worst };
 }
 
@@ -389,7 +383,6 @@ function renderSection(tab){
   else if(tab==='admin') renderAdmin();
 }
 
-// ── HOME ────────────────────────────────────────────────
 function renderHome(){
   const el=document.getElementById('home-content');
   if(!state.currentUser){
@@ -410,9 +403,43 @@ function renderHome(){
     ?`<span class="streak-pill ${st.type==='w'?'streak-w':st.type==='l'?'streak-l':'streak-n'}">${st.len} ${st.type==='w'?'victorias':st.type==='l'?'derrotas':'empates'} seguidas</span>`
     :`<span class="streak-pill streak-n">Sin racha aún</span>`;
   
+  const {mvp,worst}=calcMonthStats();
   const affinities = getAffinities(state.currentUser);
 
+  // HTML Último partido
+  const lastHtml=s.lastMatch?`
+    <div class="last-match">
+      <div class="lm-date">${formatDate(s.lastMatch.date)}${s.lastMatch.location?' · '+s.lastMatch.location:''}</div>
+      <div class="lm-teams">${state.currentUser} &amp; ${s.lastMatch.partner} <span style="color:var(--text3)">vs</span> ${s.lastMatch.opp1} &amp; ${s.lastMatch.opp2}</div>
+      <div class="lm-score">${s.lastMatch.score} <span class="badge ${s.lastMatch.res==='w'?'badge-w':s.lastMatch.res==='l'?'badge-l':'badge-d'}">${s.lastMatch.res==='w'?'VICTORIA':s.lastMatch.res==='l'?'DERROTA':'EMPATE'}</span></div>
+    </div>`:`<div style="margin-top:12px;font-size:13px;color:var(--text3)">Sin partidos jugados aún.</div>`;
+
+  // HTML MVP/Peor del mes
+  const mvpHtml=mvp?`
+    <div class="card card-yellow" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="mvp-card">
+          <div class="avatar-md" style="background:#2d4a1e;border:2px solid var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--yellow);flex-shrink:0">${initials(mvp.name)}</div>
+          <div>
+            <div class="mvp-label" style="color:var(--yellow)">⭐ MVP del mes</div>
+            <div class="mvp-name" style="color:var(--yellow)">${mvp.name.split(' ')[0]}</div>
+            <div class="mvp-sub">${mvp.w}V · ${mvp.total} partidos</div>
+          </div>
+        </div>
+        ${worst&&worst.name!==mvp.name?`
+        <div class="mvp-card">
+          <div class="avatar-md" style="background:#2a1a18;border:2px solid var(--loss);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--loss);flex-shrink:0">${initials(worst.name)}</div>
+          <div>
+            <div class="mvp-label" style="color:var(--loss)">📉 Peor del mes</div>
+            <div class="mvp-name" style="color:var(--loss)">${worst.name.split(' ')[0]}</div>
+            <div class="mvp-sub">${worst.w}V · ${worst.total} partidos</div>
+          </div>
+        </div>`:''}
+      </div>
+    </div>`:'';
+
   el.innerHTML=`
+    ${mvpHtml}
     <div class="card card-accent">
       <div class="profile-header">
         <div class="avatar avatar-lg">${initials(state.currentUser)}</div>
@@ -422,11 +449,13 @@ function renderHome(){
         </div>
         <button class="btn btn-sm" onclick="selectUser(null)">Cambiar</button>
       </div>
-      <div class="stats-row">
-        <div class="stat stat-win"><div class="stat-n">${s.w}</div><div class="stat-l">Victorias</div></div>
-        <div class="stat stat-loss"><div class="stat-n">${s.l}</div><div class="stat-l">Derrotas</div></div>
-        <div class="stat stat-draw"><div class="stat-n">${s.d}</div><div class="stat-l">Empates</div></div>
-      </div>
+      ${lastHtml}
+    </div>
+
+    <div class="stats-row">
+      <div class="stat stat-win"><div class="stat-n">${s.w}</div><div class="stat-l">Victorias</div></div>
+      <div class="stat stat-loss"><div class="stat-n">${s.l}</div><div class="stat-l">Derrotas</div></div>
+      <div class="stat stat-draw"><div class="stat-n">${s.d}</div><div class="stat-l">Empates</div></div>
     </div>
 
     ${affinities.best ? `
@@ -446,7 +475,6 @@ function renderHome(){
     <button class="btn" style="width:100%;margin-top:4px" onclick="showPerfilModal('${esc(state.currentUser)}')">Ver mi historial detallado →</button>`;
 }
 
-// ── INDIVIDUAL ──────────────────────────────────────────
 function renderIndividual(){
   const {ps}=calcStats();
   const ranked=rankPlayers(ps);
@@ -467,7 +495,10 @@ function renderIndividual(){
             <td class="pos-num ${i===0?'pos-1':i===1?'pos-2':i===2?'pos-3':''}" style="text-align:center">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
             <td class="pname">${p.name}</td>
             <td><span class="rec-w">${p.w}</span><span style="color:var(--text3)">-</span><span class="rec-e">${p.d}</span><span style="color:var(--text3)">-</span><span class="rec-l">${p.l}</span></td>
-            <td><span style="font-size:11px">${winPct(p.w,p.total)}%</span></td>
+            <td>
+              <span style="font-size:11px">${winPct(p.w,p.total)}%</span>
+              <div class="pct-bar"><div class="pct-fill" style="width:${winPct(p.w,p.total)}%"></div></div>
+            </td>
             <td style="font-size:11px;color:var(--text2)">${p.gw}-${p.gl}</td>
           </tr>`).join('')}
         </tbody>
@@ -475,7 +506,6 @@ function renderIndividual(){
     </div>`;
 }
 
-// ── PAREJAS ─────────────────────────────────────────────
 function renderParejas(){
   const {pairs}=calcStats();
   const ranked=rankPairs(pairs);
@@ -496,7 +526,10 @@ function renderParejas(){
             <td class="pos-num ${i===0?'pos-1':i===1?'pos-2':i===2?'pos-3':''}" style="text-align:center">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
             <td class="pname" style="font-size:11px">${p.p1} &amp; ${p.p2}</td>
             <td><span class="rec-w">${p.w}</span><span style="color:var(--text3)">-</span><span class="rec-e">${p.d}</span><span style="color:var(--text3)">-</span><span class="rec-l">${p.l}</span></td>
-            <td><span style="font-size:11px">${winPct(p.w,p.total)}%</span></td>
+            <td>
+              <span style="font-size:11px">${winPct(p.w,p.total)}%</span>
+              <div class="pct-bar"><div class="pct-fill" style="width:${winPct(p.w,p.total)}%"></div></div>
+            </td>
             <td style="font-size:11px;color:var(--text2)">${p.gw}-${p.gl}</td>
           </tr>`).join('')}
         </tbody>
@@ -504,7 +537,6 @@ function renderParejas(){
     </div>`;
 }
 
-// ── HISTORIAL ───────────────────────────────────────────
 function renderHistorial(){
   const el=document.getElementById('historial-content');
   if(!state.matches.length){el.innerHTML=emptyState('No hay partidos.');return;}
@@ -524,7 +556,6 @@ function renderHistorial(){
   }).join('');
 }
 
-// ── ADMIN ───────────────────────────────────────────────
 function renderAdmin(){
   const el=document.getElementById('admin-content');
   const opts=state.players.map(p=>`<option value="${p}">${p}</option>`).join('');
@@ -548,12 +579,10 @@ function renderAdmin(){
     </div>`;
 }
 
-// ── PERFIL MODAL ────────────────────────────────────────
 function showPerfilModal(playerName){
   const {ps}=calcStats();
   const s=ps[playerName]||{w:0,l:0,d:0,gw:0,gl:0};
   const myMatches=state.matches.filter(m=>[m.t1p1,m.t1p2,m.t2p1,m.t2p2].includes(playerName)).sort((a,b)=>b.date.localeCompare(a.date));
-
   const h2h={};
   myMatches.forEach(m=>{
     const inT1=[m.t1p1,m.t1p2].includes(playerName);
@@ -561,10 +590,8 @@ function showPerfilModal(playerName){
     const oppTeam=inT1?[m.t2p1,m.t2p2]:[m.t1p1,m.t1p2];
     oppTeam.forEach(opp=>{ if(!h2h[opp])h2h[opp]={w:0,l:0,d:0}; h2h[opp][res]++; });
   });
-
   const h2hRows=Object.entries(h2h).sort((a,b)=>(b[1].w+b[1].l+b[1].d)-(a[1].w+a[1].l+a[1].d)).map(([opp,r])=>`
     <div class="h2h-row"><div class="h2h-name">${opp}</div><div class="h2h-record"><span class="rec-w">${r.w}V</span> <span class="rec-e">${r.d}E</span> <span class="rec-l">${r.l}D</span></div></div>`).join('');
-
   document.getElementById('modal-perfil-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div class="avatar avatar-md">${initials(playerName)}</div>
@@ -581,14 +608,12 @@ function showPerfilModal(playerName){
   document.getElementById('modal-perfil').classList.add('open');
 }
 
-// ── ACTIONS ─────────────────────────────────────────────
 async function addMatch(){
   const t1p1=document.getElementById('t1p1').value, t1p2=document.getElementById('t1p2').value;
   const t2p1=document.getElementById('t2p1').value, t2p2=document.getElementById('t2p2').value;
   const s1=parseInt(document.getElementById('s1').value), s2=parseInt(document.getElementById('s2').value);
   const date=document.getElementById('mdate').value, score=document.getElementById('score-str').value.trim();
   const location=document.getElementById('location').value;
-
   if(new Set([t1p1,t1p2,t2p1,t2p2]).size<4){showAdminAlert('Jugadores repetidos','err');return;}
   state.matches.push({t1p1,t1p2,t2p1,t2p2,s1,s2,date,score,location});
   showAdminAlert('Guardando...','info');
@@ -608,7 +633,12 @@ function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){ if(e.target===this) closeModal(this.id); }));
 function initials(name){ return name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
-function formatDate(str){ if(!str)return ''; const [y,m,d]=str.split('-'); return parseInt(d)+'/'+parseInt(m); }
+function formatDate(str){
+  if(!str) return '';
+  const [y,m,d]=str.split('-');
+  const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return parseInt(d)+' '+months[parseInt(m)-1]+' '+y;
+}
 function emptyState(msg){ return '<div class="empty">'+msg+'</div>'; }
 function showAdminAlert(msg,type){ const el=document.getElementById('admin-alert'); el.className='alert alert-'+type; el.textContent=msg; el.style.display=''; }
 function esc(s){ return s.replace(/'/g,"\\'").replace(/\"/g,'&quot;'); }
