@@ -62,6 +62,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .avatar{width:44px;height:44px;border-radius:50%;background:var(--green-mid);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;color:#fff;margin:0 auto 8px;letter-spacing:1px;border:2px solid var(--border2)}
 .avatar-lg{width:60px;height:60px;font-size:20px;margin:0}
 .avatar-md{width:48px;height:48px;font-size:17px;margin:0}
+.avatar-img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}.avatar-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
 .player-card-name{font-size:13px;font-weight:500;color:var(--text)}
 .profile-header{display:flex;align-items:center;gap:16px;margin-bottom:16px}
 .profile-name{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--text);line-height:1}
@@ -241,6 +242,18 @@ const JSONBIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
 const ADMIN_PASS = "Grumete";
 const LOCATIONS = ["La Hípica","Alberto Maestro","Soccer Ranillas","Expo","Aragonia"];
 const DEFAULT_PLAYERS = ["Alejandro Bueno","Lucas Badiola","Alfonso Tremul","Pablo Mateo","Daniel Gallego","Bosco Garrido","Yago Montero","Alex Lopez","Jorge Alarcón","Pablo Ortega","Pablo Cuervo"];
+const PLAYER_PHOTOS = {
+  "Alex Lopez":"https://drive.google.com/thumbnail?id=1n0gB-8yUcVFKSHbLUMADhKUtJCFi_IX1&sz=w1000",
+  "Alfonso Tremul":"https://drive.google.com/thumbnail?id=12vB42RARc8RFmxvWJJpo6uQ7zyf_rYQj&sz=w1000",
+  "Alejandro Bueno":"https://drive.google.com/thumbnail?id=1OPanvgrtQEVIKuc4dYsVarVIUedlmWK6&sz=w1000",
+  "Daniel Gallego":"https://drive.google.com/thumbnail?id=15j5lEpSpORNTqwMck8IbWQ6P0kDAcIph&sz=w1000",
+  "Jorge Alarcón":"https://drive.google.com/thumbnail?id=1DL6JamANVD947yUC9r2_G0qUcOmMnuKb&sz=w1000",
+  "Lucas Badiola":"https://drive.google.com/thumbnail?id=1n5YNCr_hhXiTBdr-6EPixWR9e7YiIiEn&sz=w1000",
+  "Pablo Mateo":"https://drive.google.com/thumbnail?id=1O7u1T2hwOHiV5WhCMNbGYbKZdxI2oG7t&sz=w1000",
+  "Pablo Ortega":"https://drive.google.com/thumbnail?id=1u2kG9CGGwoIBQ-H3TZlURHJb8FdnvO1S&sz=w1000",
+  "Pablo Cuervo":"https://drive.google.com/thumbnail?id=1ZoWQL3TJdRPusRI7CMKvsaLl-gva_371&sz=w1000",
+  "Yago Montero":"https://drive.google.com/thumbnail?id=1L2noWmkXCBs3whxJDwkFxdngXuuLX5w0&sz=w1000"
+};
 
 let state = { players:[...DEFAULT_PLAYERS], matches:[], isAdmin:false, currentUser:null };
 const ACHIEVEMENT_META = {
@@ -571,7 +584,7 @@ function renderHome(){
       <div class="alert alert-info" style="margin-bottom:16px">Elige tu nombre para ver tus estadísticas personales.</div>
       <div class="player-grid">${state.players.map(p=>`
         <div class="player-card" onclick="selectUser('${esc(p)}')">
-          <div class="avatar">${initials(p)}</div>
+          ${renderAvatar(p)}
           <div class="player-card-name">${p}</div>
         </div>`).join('')}
       </div>`;
@@ -602,7 +615,7 @@ function renderHome(){
     <div class="card card-yellow" style="margin-bottom:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="mvp-card">
-          <div class="avatar-md" style="background:#2d4a1e;border:2px solid var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--yellow);flex-shrink:0">${initials(mvp.name)}</div>
+          <div style="flex-shrink:0">${renderAvatar(mvp.name,'avatar-md')}</div>
           <div>
             <div class="mvp-label" style="color:var(--yellow)">⭐ MVP del mes</div>
             <div class="mvp-name" style="color:var(--yellow)">${mvp.name.split(' ')[0]}</div>
@@ -611,7 +624,7 @@ function renderHome(){
         </div>
         ${worst&&worst.name!==mvp.name?`
         <div class="mvp-card">
-          <div class="avatar-md" style="background:#2a1a18;border:2px solid var(--loss);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--loss);flex-shrink:0">${initials(worst.name)}</div>
+          <div style="flex-shrink:0">${renderAvatar(worst.name,'avatar-md')}</div>
           <div>
             <div class="mvp-label" style="color:var(--loss)">📉 Peor del mes</div>
             <div class="mvp-name" style="color:var(--loss)">${worst.name.split(' ')[0]}</div>
@@ -625,7 +638,7 @@ function renderHome(){
     ${mvpHtml}
     <div class="card card-accent">
       <div class="profile-header">
-        <div class="avatar avatar-lg">${initials(state.currentUser)}</div>
+        ${renderAvatar(state.currentUser,'avatar-lg')}
         <div style="flex:1">
           <div class="profile-name">${state.currentUser}<small>Jugador activo</small></div>
           ${streakHtml}
@@ -792,7 +805,7 @@ function showPerfilModal(playerName){
     <div class="h2h-row"><div class="h2h-name">${opp}</div><div class="h2h-record"><span class="rec-w">${r.w}V</span> <span class="rec-e">${r.d}E</span> <span class="rec-l">${r.l}D</span></div></div>`).join('');
   document.getElementById('modal-perfil-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <div class="avatar avatar-md">${initials(playerName)}</div>
+      ${renderAvatar(playerName,'avatar-md')}
       <div><div class="modal-title" style="margin-bottom:2px">${playerName}</div><div style="font-size:12px;color:var(--text3)">${s.w}V - ${s.d}E - ${s.l}D</div></div>
     </div>
     <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Cara a cara</div>
@@ -829,6 +842,14 @@ function tryLogin(){ if(document.getElementById('pass-input').value===ADMIN_PASS
 function doLogout(){ state.isAdmin=false; document.getElementById('admin-label').style.display='none'; document.getElementById('admin-tab').style.display='none'; document.getElementById('login-btn').style.display=''; document.getElementById('logout-btn').style.display='none'; showTab('home',document.querySelector('.tab')); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){ if(e.target===this) closeModal(this.id); }));
+function renderAvatar(name, extraClass="") {
+  const photo = PLAYER_PHOTOS[name];
+  const cls = `avatar${extraClass ? ` ${extraClass}` : ""}`;
+  const fallback = `<span class="avatar-fallback">${initials(name)}</span>`;
+  if(!photo) return `<div class="${cls}">${fallback}</div>`;
+  return `<div class="${cls}"><img src="${photo}" alt="${esc(name)}" class="avatar-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none';this.insertAdjacentHTML('afterend','<span class=&quot;avatar-fallback&quot;>${initials(name)}</span>');"></div>`;
+}
+
 function initials(name){ return name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
 function formatDate(str){
