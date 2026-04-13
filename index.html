@@ -282,46 +282,43 @@ function currentStreak(streak){
 
 function winPct(w,total){ return total?Math.round(w/total*100):0; }
 
-// Criterios de clasificación (jerarquía estricta):
-// 1. Victorias totales
-// 2. Con mismas victorias: Regla de Oro de actividad + % victorias
-//    - Si A jugó menos de la mitad de partidos que B → B va delante
-//    - Si ambos cumplen mínimo de actividad → mejor % va delante
-// 3. Empate total: más jugados si %>0, menos jugados si %=0
-// 4. Diferencia de puntos (gw-gl)
-// 5. Menos empates
+// Criterios de clasificación actualizados:
 function rankPlayers(ps){
   return Object.entries(ps)
     .map(([name,s])=>({name,...s,total:s.w+s.l+s.d}))
     .sort((a,b)=>{
-      // 1. Victorias
+      // 1. VICTORIAS TOTALES
       if(b.w !== a.w) return b.w - a.w;
 
-      // 2. Regla de Oro + % victorias
       const pa = a.total ? a.w/a.total : 0;
       const pb = b.total ? b.w/b.total : 0;
-      // ¿Cumple A el mínimo de actividad respecto a B?
-      const aValidVsB = b.total === 0 || a.total >= b.total / 2;
-      const bValidVsA = a.total === 0 || b.total >= a.total / 2;
-      if(!aValidVsB && bValidVsA) return 1;  // A jugó menos de la mitad → B va delante
-      if(!bValidVsA && aValidVsB) return -1; // B jugó menos de la mitad → A va delante
-      // Ambos cumplen mínimo: mejor % va delante
-      if(Math.abs(pb - pa) > 0.0001) return pb - pa;
 
-      // 3. Mismos partidos o mismo %: más jugados si %>0, menos jugados si %=0
-      if(a.total !== b.total){
-        if(pa > 0) return b.total - a.total;
-        else return a.total - b.total;
+      if (a.w > 0) {
+        // 2. FILTRO DE ACTIVIDAD (Regla de la mitad de partidos)
+        if (a.total < b.total / 2) return 1;
+        if (b.total < a.total / 2) return -1;
+
+        // 3. PORCENTAJE DE VICTORIAS
+        if (Math.abs(pb - pa) > 0.0001) return pb - pa;
+
+        // Si el % es idéntico, premiamos al que más ha jugado
+        if (b.total !== a.total) return b.total - a.total;
+      } else {
+        // 4. CASO 0 VICTORIAS: Va delante el que MENOS haya jugado
+        if (a.total !== b.total) return a.total - b.total;
       }
 
-      // 4. Diferencia de puntos
-      const da = a.gw - a.gl, db = b.gw - b.gl;
-      if(db !== da) return db - da;
+      // 5. DIFERENCIA DE PUNTOS (GAMES GANADOS - GAMES PERDIDOS)
+      const da = a.gw - a.gl;
+      const db = b.gw - b.gl;
+      if (db !== da) return db - da;
 
-      // 5. Menos empates
+      // 6. MENOR NÚMERO DE EMPATES
       return a.d - b.d;
     });
 }
+
+  
 function rankPairs(pairs){
   return Object.values(pairs)
     .map(p=>({...p,total:p.w+p.l+p.d}))
