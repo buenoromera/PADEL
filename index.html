@@ -282,23 +282,46 @@ function currentStreak(streak){
 
 function winPct(w,total){ return total?Math.round(w/total*100):0; }
 
-// Orden estilo NBA:
-// 1. No puedes ir por delante de quien ha jugado más partidos que tú
-// 2. Mismos partidos: mayor % de victorias
-// 3. Mismas victorias: mayor % de games ganados (gw/(gw+gl))
-function gamePct(gw,gl){ const t=gw+gl; return t?gw/t:0; }
+// Criterios de clasificación (jerarquía estricta):
+// 1. Victorias totales
+// 2. Con mismas victorias: Regla de Oro de actividad + % victorias
+//    - Si A jugó menos de la mitad de partidos que B → B va delante
+//    - Si ambos cumplen mínimo de actividad → mejor % va delante
+// 3. Empate total: más jugados si %>0, menos jugados si %=0
+// 4. Diferencia de puntos (gw-gl)
+// 5. Menos empates
 function rankPlayers(ps){
   return Object.entries(ps)
     .map(([name,s])=>({name,...s,total:s.w+s.l+s.d}))
     .sort((a,b)=>{
-      if(a.total < b.total) return 1;
-      if(b.total < a.total) return -1;
-      const pa=winPct(a.w,a.total), pb=winPct(b.w,b.total);
-      if(pb!==pa) return pb-pa;
-      return gamePct(b.gw,b.gl)-gamePct(a.gw,a.gl);
+      // 1. Victorias
+      if(b.w !== a.w) return b.w - a.w;
+
+      // 2. Regla de Oro + % victorias
+      const pa = a.total ? a.w/a.total : 0;
+      const pb = b.total ? b.w/b.total : 0;
+      // ¿Cumple A el mínimo de actividad respecto a B?
+      const aValidVsB = b.total === 0 || a.total >= b.total / 2;
+      const bValidVsA = a.total === 0 || b.total >= a.total / 2;
+      if(!aValidVsB && bValidVsA) return 1;  // A jugó menos de la mitad → B va delante
+      if(!bValidVsA && aValidVsB) return -1; // B jugó menos de la mitad → A va delante
+      // Ambos cumplen mínimo: mejor % va delante
+      if(Math.abs(pb - pa) > 0.0001) return pb - pa;
+
+      // 3. Mismos partidos o mismo %: más jugados si %>0, menos jugados si %=0
+      if(a.total !== b.total){
+        if(pa > 0) return b.total - a.total;
+        else return a.total - b.total;
+      }
+
+      // 4. Diferencia de puntos
+      const da = a.gw - a.gl, db = b.gw - b.gl;
+      if(db !== da) return db - da;
+
+      // 5. Menos empates
+      return a.d - b.d;
     });
 }
-
 function rankPairs(pairs){
   return Object.values(pairs)
     .map(p=>({...p,total:p.w+p.l+p.d}))
