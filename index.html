@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -138,6 +139,38 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .mvp-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:4px}
 .mvp-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
 .mvp-sub{font-size:12px;color:var(--text3);margin-top:2px}
+
+.achievements-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.achievement-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;transition:all .2s}
+.achievement-card strong{display:block;font-size:12px;color:var(--text);margin-bottom:4px}
+.achievement-card span{display:block;font-size:11px;color:var(--text2);line-height:1.35}
+.achievement-card.locked{opacity:.55;filter:grayscale(1) blur(.3px);background:rgba(255,255,255,0.02)}
+.achievement-card.unlocked{border-color:rgba(244,208,63,0.45);box-shadow:0 0 0 1px rgba(244,208,63,0.18) inset, 0 0 18px rgba(244,208,63,0.08);background:linear-gradient(180deg,rgba(244,208,63,0.08),rgba(82,183,136,0.04))}
+.achievement-status{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;font-weight:700;letter-spacing:.5px;margin-bottom:8px}
+.achievement-card.unlocked .achievement-status{background:rgba(244,208,63,0.18);color:var(--yellow);border:1px solid rgba(244,208,63,0.25)}
+.achievement-card.locked .achievement-status{background:rgba(165,201,170,0.08);color:var(--text3);border:1px solid var(--border)}
+.form-dots{display:flex;gap:5px;align-items:center;min-width:64px}
+.form-dot{width:10px;height:10px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.12)}
+.form-dot.w{background:var(--win)}
+.form-dot.d{background:var(--draw)}
+.form-dot.l{background:var(--loss)}
+.form-dot.n{background:rgba(255,255,255,0.08)}
+.achievement-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.achievement-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,0.05);border:1px solid var(--border);flex-shrink:0}
+.achievement-copy{min-width:0}
+.achievement-card strong{margin-bottom:0}
+.achievement-card.unlocked .achievement-icon{background:rgba(244,208,63,0.14);border-color:rgba(244,208,63,0.26);box-shadow:0 0 12px rgba(244,208,63,0.12)}
+.achievement-card.new-unlock{animation:achievementPop .9s ease, achievementGlow 1.6s ease}
+@keyframes achievementPop{0%{transform:scale(.94)}45%{transform:scale(1.03)}100%{transform:scale(1)}}
+@keyframes achievementGlow{0%{box-shadow:0 0 0 0 rgba(244,208,63,0)}40%{box-shadow:0 0 0 1px rgba(244,208,63,0.25) inset,0 0 26px rgba(244,208,63,0.28)}100%{box-shadow:0 0 0 1px rgba(244,208,63,0.18) inset,0 0 18px rgba(244,208,63,0.08)}}
+#achievement-toast-container{position:fixed;right:16px;bottom:18px;z-index:999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.achievement-toast{min-width:240px;max-width:300px;background:linear-gradient(180deg,rgba(36,63,44,0.98),rgba(15,31,20,0.98));border:1px solid rgba(244,208,63,0.35);border-radius:12px;padding:12px 14px;box-shadow:0 14px 28px rgba(0,0,0,0.28);display:flex;align-items:center;gap:10px;color:var(--text);animation:toastIn .35s ease, toastOut .35s ease 2.75s forwards}
+.achievement-toast-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(244,208,63,0.14);font-size:18px;flex-shrink:0}
+.achievement-toast small{display:block;font-size:10px;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.achievement-toast strong{display:block;font-size:13px;color:var(--text)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(10px)}}
+
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--green-mid);border-radius:2px}
@@ -199,6 +232,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
 </div>
 
+<div id="achievement-toast-container"></div>
+
 <script>
 const BIN_ID = "69dbcfc7856a68218927541a";
 const API_KEY = "$2a$10$iTTODe3UklLvnQpRfaWDFeR4/Fp3NQb/oM0MSxHImKBYPKDzN.3CC";
@@ -208,6 +243,18 @@ const LOCATIONS = ["La Hípica","Alberto Maestro","Soccer Ranillas","Expo","Arag
 const DEFAULT_PLAYERS = ["Alejandro Bueno","Lucas Badiola","Alfonso Tremul","Pablo Mateo","Daniel Gallego","Bosco Garrido","Yago Montero","Alex Lopez","Jorge Alarcón","Pablo Ortega","Pablo Cuervo"];
 
 let state = { players:[...DEFAULT_PLAYERS], matches:[], isAdmin:false, currentUser:null };
+const ACHIEVEMENT_META = {
+  '100': { icon:'💯' },
+  '50': { icon:'5️⃣' },
+  'conquistador': { icon:'🏟️' },
+  'vayadia': { icon:'😵' },
+  'apisonadora': { icon:'🚜' },
+  'destructor': { icon:'💣' },
+  'rey': { icon:'👑' },
+  'bienvenido': { icon:'🎉' },
+  'pareja': { icon:'🤝' }
+};
+const ACHIEVEMENTS_STORAGE_KEY = 'ligaGrumetil_seenAchievements_v1';
 
 async function loadFromCloud() {
   try {
@@ -282,6 +329,140 @@ function currentStreak(streak){
 }
 
 function winPct(w,total){ return total?Math.round(w/total*100):0; }
+
+function parseScoreSets(score){
+  if(!score) return [];
+  return score.split('/').map(set=>{
+    const parts=set.trim().split('-').map(v=>parseInt(v,10));
+    if(parts.length!==2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
+    return {a:parts[0],b:parts[1]};
+  }).filter(Boolean);
+}
+
+function getPlayerMatchHistory(player){
+  return state.matches
+    .filter(m=>[m.t1p1,m.t1p2,m.t2p1,m.t2p2].includes(player))
+    .map(m=>{
+      const inT1=[m.t1p1,m.t1p2].includes(player);
+      const res=inT1?(m.s1>m.s2?'w':m.s1<m.s2?'l':'d'):(m.s2>m.s1?'w':m.s2<m.s1?'l':'d');
+      const partner=inT1 ? [m.t1p1,m.t1p2].find(x=>x!==player) : [m.t2p1,m.t2p2].find(x=>x!==player);
+      const opponents=inT1 ? [m.t2p1,m.t2p2] : [m.t1p1,m.t1p2];
+      return {...m,res,partner,opponents};
+    })
+    .sort((a,b)=> b.date.localeCompare(a.date));
+}
+
+function getRecentForm(player,limit=5){
+  const history=getPlayerMatchHistory(player).slice(0,limit).map(m=>m.res);
+  while(history.length<limit) history.push('n');
+  return history;
+}
+
+
+function getSeenAchievementsMap(){
+  try { return JSON.parse(localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+
+function saveSeenAchievementsMap(map){
+  try { localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(map)); }
+  catch(e){}
+}
+
+function getNewlyUnlockedAchievements(player){
+  const achievements=getAchievements(player);
+  const seenMap=getSeenAchievementsMap();
+  if(!seenMap[player]){
+    seenMap[player]=achievements.filter(a=>a.unlocked).map(a=>a.key);
+    saveSeenAchievementsMap(seenMap);
+    return [];
+  }
+  const seen=new Set(seenMap[player]||[]);
+  return achievements.filter(a=>a.unlocked && !seen.has(a.key));
+}
+
+function markAchievementsSeen(player, achievements){
+  const seenMap=getSeenAchievementsMap();
+  const seen=new Set(seenMap[player]||[]);
+  achievements.filter(a=>a.unlocked).forEach(a=>seen.add(a.key));
+  seenMap[player]=Array.from(seen);
+  saveSeenAchievementsMap(seenMap);
+}
+
+function showAchievementToast(achievement){
+  const wrap=document.getElementById('achievement-toast-container');
+  if(!wrap) return;
+  const toast=document.createElement('div');
+  toast.className='achievement-toast';
+  toast.innerHTML=`<div class="achievement-toast-icon">${achievement.icon||'🏆'}</div><div><small>Logro desbloqueado</small><strong>${achievement.title}</strong></div>`;
+  wrap.appendChild(toast);
+  setTimeout(()=>toast.remove(), 3100);
+}
+
+function getAchievements(player){
+  const {ps,pairs}=calcStats();
+  const s=ps[player]||{w:0,l:0,d:0,gw:0,gl:0};
+  const history=getPlayerMatchHistory(player);
+  const wonLocations=new Set();
+  const beatenPlayers=new Set();
+  let lostWithBagel=false;
+  let wonWithBagel=false;
+  let samePartnerWins=0;
+
+  history.forEach(m=>{
+    const sets=parseScoreSets(m.score);
+    if(m.res==='w'){
+      if(m.location) wonLocations.add(m.location);
+      m.opponents.forEach(o=>beatenPlayers.add(o));
+    }
+    if(m.res==='w' && sets.some(set=> (m.t1p1===player || m.t1p2===player) ? (set.a===6 && set.b===0) : (set.b===6 && set.a===0))){
+      wonWithBagel=true;
+    }
+    if(m.res==='l' && sets.some(set=> (m.t1p1===player || m.t1p2===player) ? (set.a===0 && set.b===6) : (set.b===0 && set.a===6))){
+      lostWithBagel=true;
+    }
+  });
+
+  Object.values(pairs).forEach(pair=>{
+    if((pair.p1===player || pair.p2===player) && pair.w>=2) samePartnerWins=Math.max(samePartnerWins,pair.w);
+  });
+
+  const others=Math.max(state.players.length-1,0);
+  const halfPlayers=Math.ceil(others/2);
+
+  return [
+    {key:'100', title:'El club de los 100', desc:'Ganas 100 puntos entre todos tus partidos.', unlocked:s.gw>=100},
+    {key:'50', title:'El club de los 50', desc:'Ganas 50 puntos entre todos tus partidos.', unlocked:s.gw>=50},
+    {key:'conquistador', title:'Conquistador', desc:'Has ganado en todos los campos de la liga.', unlocked:LOCATIONS.every(loc=>wonLocations.has(loc)) && LOCATIONS.length>0},
+    {key:'vayadia', title:'Vaya Día!', desc:'Has perdido un partido con un set en blanco (0-6).', unlocked:lostWithBagel},
+    {key:'apisonadora', title:'Apisonadora', desc:'Has ganado un partido con un set en blanco (6-0).', unlocked:wonWithBagel},
+    {key:'destructor', title:'Destructor', desc:'Has ganado al 50% de los jugadores de la liga.', unlocked:others>0 && beatenPlayers.size>=halfPlayers},
+    {key:'rey', title:'El Rey', desc:'Has ganado a todos los jugadores de la liga.', unlocked:others>0 && beatenPlayers.size>=others},
+    {key:'bienvenido', title:'Bienvenido', desc:'Has ganado tu primer partido de la liga.', unlocked:s.w>=1},
+    {key:'pareja', title:'Pareja de baile', desc:'Has ganado dos veces con la misma pareja.', unlocked:samePartnerWins>=2}
+  ];
+}
+
+function achievementCardsHtml(player, newKeys=[]){
+  const newSet=new Set(newKeys);
+  return getAchievements(player).map(a=>{
+    const icon=(ACHIEVEMENT_META[a.key]&&ACHIEVEMENT_META[a.key].icon)||'🏆';
+    return `
+    <div class="achievement-card ${a.unlocked?'unlocked':'locked'} ${newSet.has(a.key)?'new-unlock':''}">
+      <div class="achievement-status">${a.unlocked?'DESBLOQUEADO':'BLOQUEADO'}</div>
+      <div class="achievement-head">
+        <div class="achievement-icon">${icon}</div>
+        <div class="achievement-copy"><strong>${a.title}</strong></div>
+      </div>
+      <span>${a.desc}</span>
+    </div>
+  `}).join('');
+}
+
+function recentFormHtml(player){
+  return `<div class="form-dots">${getRecentForm(player,5).map(r=>`<span class="form-dot ${r}" title="${r==='w'?'Victoria':r==='d'?'Empate':r==='l'?'Derrota':'Sin dato'}"></span>`).join('')}</div>`;
+}
+
 
 function rankPlayers(ps){
   return Object.entries(ps)
@@ -405,6 +586,8 @@ function renderHome(){
   
   const {mvp,worst}=calcMonthStats();
   const affinities = getAffinities(state.currentUser);
+  const newlyUnlockedAchievements = getNewlyUnlockedAchievements(state.currentUser);
+  const newlyUnlockedKeys = newlyUnlockedAchievements.map(a=>a.key);
 
   // HTML Último partido
   const lastHtml=s.lastMatch?`
@@ -472,7 +655,20 @@ function renderHome(){
       </div>
     </div>` : ''}
 
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="font-size:18px;margin-bottom:10px;color:var(--text)">Logros desbloqueados</div>
+      <div class="achievements-grid">${achievementCardsHtml(state.currentUser, newlyUnlockedKeys)}</div>
+    </div>
+
     <button class="btn" style="width:100%;margin-top:4px" onclick="showPerfilModal('${esc(state.currentUser)}')">Ver mi historial detallado →</button>`;
+
+  if(newlyUnlockedAchievements.length){
+    newlyUnlockedAchievements.forEach((a,i)=>{
+      const icon=(ACHIEVEMENT_META[a.key]&&ACHIEVEMENT_META[a.key].icon)||'🏆';
+      setTimeout(()=>showAchievementToast({...a,icon}), 180 + (i*180));
+    });
+  }
+  markAchievementsSeen(state.currentUser, getAchievements(state.currentUser));
 }
 
 function renderIndividual(){
@@ -489,6 +685,7 @@ function renderIndividual(){
           <th>V-E-D</th>
           <th>%V</th>
           <th>JG-JP</th>
+          <th>Racha</th>
         </tr></thead>
         <tbody>${ranked.map((p,i)=>`
           <tr style="cursor:pointer" onclick="showPerfilModal('${esc(p.name)}')">
@@ -500,6 +697,7 @@ function renderIndividual(){
               <div class="pct-bar"><div class="pct-fill" style="width:${winPct(p.w,p.total)}%"></div></div>
             </td>
             <td style="font-size:11px;color:var(--text2)">${p.gw}-${p.gl}</td>
+            <td>${recentFormHtml(p.name)}</td>
           </tr>`).join('')}
         </tbody>
       </table>
