@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,7 +8,7 @@
 <style>
 :root {
   --green: #1a472a;
-  --green-mid: #062e1c;
+  --green-mid: #2d6a4f;
   --green-light: #52b788;
   --yellow: #f4d03f;
   --yellow-dark: #d4ac0d;
@@ -55,6 +54,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px}
 .card-accent{border-left:3px solid var(--green-light)}
 .card-yellow{border-left:3px solid var(--yellow)}
+.card-loss{border-left:3px solid var(--loss)}
 .player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
 .player-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s;text-align:center}
 .player-card:hover{border-color:var(--green-light);background:var(--surface2);transform:translateY(-2px)}
@@ -175,7 +175,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div id="sec-admin" class="section"><div id="admin-content"></div></div>
 </div>
 
-<!-- MODAL LOGIN -->
 <div class="modal-bg" id="modal-login">
   <div class="modal">
     <div class="modal-title">Acceso Admin</div>
@@ -191,7 +190,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
 </div>
 
-<!-- MODAL PERFIL JUGADOR -->
 <div class="modal-bg" id="modal-perfil">
   <div class="modal">
     <div id="modal-perfil-content"></div>
@@ -237,7 +235,6 @@ function calcStats(){
     const teams=[[t1p1,t1p2],[t2p1,t2p2]];
     const res=[s1>s2?'w':s1<s2?'l':'d', s1>s2?'l':s1<s2?'w':'d'];
 
-    // Calcular games reales desde el marcador exacto
     let gamesT1=0, gamesT2=0;
     if(score){
       score.split('/').forEach(set=>{
@@ -251,13 +248,15 @@ function calcStats(){
 
     teams.forEach((team,ti)=>{
       const r=res[ti];
+      const g_win = ti===0 ? gamesT1 : gamesT2;
+      const g_loss = ti===0 ? gamesT2 : gamesT1;
+
       team.forEach(p=>{
         if(!ps[p]) ps[p]={w:0,l:0,d:0,gw:0,gl:0,lastMatch:null,streak:[]};
         ps[p][r]++;
         ps[p].streak.push(r);
-        // juegos ganados/perdidos desde marcador exacto
-        ps[p].gw += ti===0?gamesT1:gamesT2;
-        ps[p].gl += ti===0?gamesT2:gamesT1;
+        ps[p].gw += g_win;
+        ps[p].gl += g_loss;
         const opp=ti===0?[t2p1,t2p2]:[t1p1,t1p2];
         const partner=team.find(x=>x!==p);
         if(!ps[p].lastMatch||date>ps[p].lastMatch.date){
@@ -265,8 +264,10 @@ function calcStats(){
         }
       });
       const key=normPair(team[0],team[1]);
-      if(!pairs[key]) pairs[key]={p1:team[0],p2:team[1],w:0,l:0,d:0};
+      if(!pairs[key]) pairs[key]={p1:team[0],p2:team[1],w:0,l:0,d:0,gw:0,gl:0};
       pairs[key][r]++;
+      pairs[key].gw += g_win;
+      pairs[key].gl += g_loss;
     });
   });
   return{ps,pairs};
@@ -282,56 +283,50 @@ function currentStreak(streak){
 
 function winPct(w,total){ return total?Math.round(w/total*100):0; }
 
-// Criterios de clasificación actualizados:
 function rankPlayers(ps){
   return Object.entries(ps)
     .map(([name,s])=>({name,...s,total:s.w+s.l+s.d}))
     .sort((a,b)=>{
-      // 1. VICTORIAS TOTALES
       if(b.w !== a.w) return b.w - a.w;
-
       const pa = a.total ? a.w/a.total : 0;
       const pb = b.total ? b.w/b.total : 0;
-
       if (a.w > 0) {
-        // 2. FILTRO DE ACTIVIDAD (Regla de la mitad de partidos)
         if (a.total < b.total / 2) return 1;
         if (b.total < a.total / 2) return -1;
-
-        // 3. PORCENTAJE DE VICTORIAS
         if (Math.abs(pb - pa) > 0.0001) return pb - pa;
-
-        // Si el % es idéntico, premiamos al que más ha jugado
         if (b.total !== a.total) return b.total - a.total;
       } else {
-        // 4. CASO 0 VICTORIAS: Va delante el que MENOS haya jugado
         if (a.total !== b.total) return a.total - b.total;
       }
-
-      // 5. DIFERENCIA DE PUNTOS (GAMES GANADOS - GAMES PERDIDOS)
       const da = a.gw - a.gl;
       const db = b.gw - b.gl;
       if (db !== da) return db - da;
-
-      // 6. MENOR NÚMERO DE EMPATES
       return a.d - b.d;
     });
 }
 
-  
 function rankPairs(pairs){
   return Object.values(pairs)
     .map(p=>({...p,total:p.w+p.l+p.d}))
     .sort((a,b)=>{
-      if(a.total < b.total) return 1;
-      if(b.total < a.total) return -1;
-      const pa=winPct(a.w,a.total), pb=winPct(b.w,b.total);
-      if(pb!==pa) return pb-pa;
-      return (b.w-b.l)-(a.w-a.l);
+      if(b.w !== a.w) return b.w - a.w;
+      const pa = a.total ? a.w/a.total : 0;
+      const pb = b.total ? b.w/b.total : 0;
+      if (a.w > 0) {
+        if (a.total < b.total / 2) return 1;
+        if (b.total < a.total / 2) return -1;
+        if (Math.abs(pb - pa) > 0.0001) return pb - pa;
+        if (b.total !== a.total) return b.total - a.total;
+      } else {
+        if (a.total !== b.total) return a.total - b.total;
+      }
+      const da = a.gw - a.gl;
+      const db = b.gw - b.gl;
+      if (db !== da) return db - da;
+      return a.d - b.d;
     });
 }
 
-// MVP y PEOR del mes (últimos 30 días)
 function calcMonthStats(){
   const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
   const cutStr=cutoff.toISOString().split('T')[0];
@@ -357,6 +352,25 @@ function calcMonthStats(){
   active.sort((a,b)=>a[1].w-b[1].w||b[1].total-a[1].total);
   const worst={name:active[0][0],...active[0][1]};
   return{mvp,worst};
+}
+
+// ── LÓGICA DE OTRA MITAD / PUNTO DÉBIL ──────────────────
+function getAffinities(user){
+  const {pairs}=calcStats();
+  const myPairs = Object.values(pairs).filter(p => p.p1 === user || p.p2 === user);
+  if(!myPairs.length) return {best:null, worst:null};
+
+  const scores = myPairs.map(p => {
+    const partner = p.p1 === user ? p.p2 : p.p1;
+    return { name: partner, w: p.w, l: p.l, d: p.d, gw: p.gw, gl: p.gl, diff: p.gw - p.gl, total: p.w+p.l+p.d };
+  });
+
+  // Mejor pareja: Más victorias -> Mejor diferencia juegos
+  const best = [...scores].sort((a,b) => b.w - a.w || b.diff - a.diff)[0];
+  // Peor pareja: Más derrotas -> Peor diferencia juegos
+  const worst = [...scores].sort((a,b) => b.l - a.l || a.diff - b.diff)[0];
+
+  return { best, worst };
 }
 
 function showTab(tab,el){
@@ -395,40 +409,10 @@ function renderHome(){
   const streakHtml=st.len
     ?`<span class="streak-pill ${st.type==='w'?'streak-w':st.type==='l'?'streak-l':'streak-n'}">${st.len} ${st.type==='w'?'victorias':st.type==='l'?'derrotas':'empates'} seguidas</span>`
     :`<span class="streak-pill streak-n">Sin racha aún</span>`;
-  const lastHtml=s.lastMatch?`
-    <div class="last-match">
-      <div class="lm-date">${formatDate(s.lastMatch.date)}${s.lastMatch.location?' · '+s.lastMatch.location:''}</div>
-      <div class="lm-teams">${state.currentUser} &amp; ${s.lastMatch.partner} <span style="color:var(--text3)">vs</span> ${s.lastMatch.opp1} &amp; ${s.lastMatch.opp2}</div>
-      <div class="lm-score">${s.lastMatch.score} <span class="badge ${s.lastMatch.res==='w'?'badge-w':s.lastMatch.res==='l'?'badge-l':'badge-d'}">${s.lastMatch.res==='w'?'VICTORIA':s.lastMatch.res==='l'?'DERROTA':'EMPATE'}</span></div>
-    </div>`:`<div style="margin-top:12px;font-size:13px;color:var(--text3)">Sin partidos jugados aún.</div>`;
-
-  // MVP del mes
-  const {mvp,worst}=calcMonthStats();
-  const mvpHtml=mvp?`
-    <div class="card card-yellow" style="margin-bottom:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="mvp-card">
-          <div class="avatar-md" style="background:#2d4a1e;border:2px solid var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--yellow);flex-shrink:0">${initials(mvp.name)}</div>
-          <div>
-            <div class="mvp-label" style="color:var(--yellow)">⭐ MVP del mes</div>
-            <div class="mvp-name" style="color:var(--yellow)">${mvp.name.split(' ')[0]}</div>
-            <div class="mvp-sub">${mvp.w}V · ${mvp.total} partidos</div>
-          </div>
-        </div>
-        ${worst&&worst.name!==mvp.name?`
-        <div class="mvp-card">
-          <div class="avatar-md" style="background:#2a1a18;border:2px solid var(--loss);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--loss);flex-shrink:0">${initials(worst.name)}</div>
-          <div>
-            <div class="mvp-label" style="color:var(--loss)">📉 Peor del mes</div>
-            <div class="mvp-name" style="color:var(--loss)">${worst.name.split(' ')[0]}</div>
-            <div class="mvp-sub">${worst.w}V · ${worst.total} partidos</div>
-          </div>
-        </div>`:''}
-      </div>
-    </div>`:'';
+  
+  const affinities = getAffinities(state.currentUser);
 
   el.innerHTML=`
-    ${mvpHtml}
     <div class="card card-accent">
       <div class="profile-header">
         <div class="avatar avatar-lg">${initials(state.currentUser)}</div>
@@ -438,14 +422,28 @@ function renderHome(){
         </div>
         <button class="btn btn-sm" onclick="selectUser(null)">Cambiar</button>
       </div>
-      ${lastHtml}
+      <div class="stats-row">
+        <div class="stat stat-win"><div class="stat-n">${s.w}</div><div class="stat-l">Victorias</div></div>
+        <div class="stat stat-loss"><div class="stat-n">${s.l}</div><div class="stat-l">Derrotas</div></div>
+        <div class="stat stat-draw"><div class="stat-n">${s.d}</div><div class="stat-l">Empates</div></div>
+      </div>
     </div>
-    <div class="stats-row">
-      <div class="stat stat-win"><div class="stat-n">${s.w}</div><div class="stat-l">Victorias</div></div>
-      <div class="stat stat-loss"><div class="stat-n">${s.l}</div><div class="stat-l">Derrotas</div></div>
-      <div class="stat stat-draw"><div class="stat-n">${s.d}</div><div class="stat-l">Empates</div></div>
-    </div>
-    <button class="btn" style="width:100%;margin-top:4px" onclick="showPerfilModal('${esc(state.currentUser)}')">Ver historial de partidos →</button>`;
+
+    ${affinities.best ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="card card-yellow" style="margin-bottom:0">
+        <div class="mvp-label" style="color:var(--yellow)">💞 Tu otra mitad</div>
+        <div class="mvp-name" style="font-size:18px">${affinities.best.name.split(' ')[0]}</div>
+        <div class="mvp-sub">${affinities.best.w}V con él/ella<br>${affinities.best.gw} games ganados</div>
+      </div>
+      <div class="card card-loss" style="margin-bottom:0">
+        <div class="mvp-label" style="color:var(--loss)">⚠️ Tu punto débil</div>
+        <div class="mvp-name" style="font-size:18px">${affinities.worst.name.split(' ')[0]}</div>
+        <div class="mvp-sub">${affinities.worst.l}D con él/ella<br>${affinities.worst.gl} games perdidos</div>
+      </div>
+    </div>` : ''}
+
+    <button class="btn" style="width:100%;margin-top:4px" onclick="showPerfilModal('${esc(state.currentUser)}')">Ver mi historial detallado →</button>`;
 }
 
 // ── INDIVIDUAL ──────────────────────────────────────────
@@ -453,7 +451,7 @@ function renderIndividual(){
   const {ps}=calcStats();
   const ranked=rankPlayers(ps);
   const el=document.getElementById('individual-content');
-  if(!state.matches.length){el.innerHTML=emptyState('No hay partidos registrados todavía.');return;}
+  if(!state.matches.length){el.innerHTML=emptyState('No hay partidos.');return;}
   el.innerHTML=`
     <div class="card" style="padding:0;overflow:hidden">
       <table class="tabla">
@@ -469,16 +467,12 @@ function renderIndividual(){
             <td class="pos-num ${i===0?'pos-1':i===1?'pos-2':i===2?'pos-3':''}" style="text-align:center">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
             <td class="pname">${p.name}</td>
             <td><span class="rec-w">${p.w}</span><span style="color:var(--text3)">-</span><span class="rec-e">${p.d}</span><span style="color:var(--text3)">-</span><span class="rec-l">${p.l}</span></td>
-            <td>
-              <span style="font-size:11px">${winPct(p.w,p.total)}%</span>
-              <div class="pct-bar"><div class="pct-fill" style="width:${winPct(p.w,p.total)}%"></div></div>
-            </td>
+            <td><span style="font-size:11px">${winPct(p.w,p.total)}%</span></td>
             <td style="font-size:11px;color:var(--text2)">${p.gw}-${p.gl}</td>
           </tr>`).join('')}
         </tbody>
       </table>
-    </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:8px;padding:0 4px">Pulsa en un jugador para ver su historial de partidos.</div>`;
+    </div>`;
 }
 
 // ── PAREJAS ─────────────────────────────────────────────
@@ -486,7 +480,7 @@ function renderParejas(){
   const {pairs}=calcStats();
   const ranked=rankPairs(pairs);
   const el=document.getElementById('parejas-content');
-  if(!ranked.length){el.innerHTML=emptyState('No hay partidos registrados todavía.');return;}
+  if(!ranked.length){el.innerHTML=emptyState('No hay partidos.');return;}
   el.innerHTML=`
     <div class="card" style="padding:0;overflow:hidden">
       <table class="tabla">
@@ -495,18 +489,15 @@ function renderParejas(){
           <th>Pareja</th>
           <th>V-E-D</th>
           <th>%V</th>
-          <th>PJ</th>
+          <th>JG-JP</th>
         </tr></thead>
         <tbody>${ranked.map((p,i)=>`
           <tr>
             <td class="pos-num ${i===0?'pos-1':i===1?'pos-2':i===2?'pos-3':''}" style="text-align:center">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
             <td class="pname" style="font-size:11px">${p.p1} &amp; ${p.p2}</td>
             <td><span class="rec-w">${p.w}</span><span style="color:var(--text3)">-</span><span class="rec-e">${p.d}</span><span style="color:var(--text3)">-</span><span class="rec-l">${p.l}</span></td>
-            <td>
-              <span style="font-size:11px">${winPct(p.w,p.total)}%</span>
-              <div class="pct-bar"><div class="pct-fill" style="width:${winPct(p.w,p.total)}%"></div></div>
-            </td>
-            <td style="font-size:11px;color:var(--text2)">${p.total}</td>
+            <td><span style="font-size:11px">${winPct(p.w,p.total)}%</span></td>
+            <td style="font-size:11px;color:var(--text2)">${p.gw}-${p.gl}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -516,19 +507,16 @@ function renderParejas(){
 // ── HISTORIAL ───────────────────────────────────────────
 function renderHistorial(){
   const el=document.getElementById('historial-content');
-  if(!state.matches.length){el.innerHTML=emptyState('No hay partidos registrados todavía.');return;}
+  if(!state.matches.length){el.innerHTML=emptyState('No hay partidos.');return;}
   const sorted=[...state.matches].map((m,i)=>({...m,_idx:i})).sort((a,b)=>b.date.localeCompare(a.date));
   el.innerHTML=sorted.map(m=>{
     const w=parseInt(m.s1)>parseInt(m.s2)?1:parseInt(m.s1)<parseInt(m.s2)?2:0;
-    const displayScore=m.score||(m.s1+'-'+m.s2);
     return`<div class="match-card">
       <div class="match-info">
-        <div class="match-date-tag">${formatDate(m.date)}${m.location?' · '+m.location:''}</div>
-        <div class="match-score-big">${displayScore} ${w===0?'<span class="badge badge-d">EMPATE</span>':''}</div>
+        <div class="match-date-tag">${formatDate(m.date)} · ${m.location||''}</div>
+        <div class="match-score-big">${m.score||(m.s1+'-'+m.s2)} ${w===0?'<span class="badge badge-d">E</span>':''}</div>
         <div class="match-teams-txt">
-          <span class="${w===1?'team-bold':''}">${m.t1p1} &amp; ${m.t1p2}</span>
-          <span style="color:var(--text3)"> vs </span>
-          <span class="${w===2?'team-bold':''}">${m.t2p1} &amp; ${m.t2p2}</span>
+          <span class="${w===1?'team-bold':''}">${m.t1p1} &amp; ${m.t1p2}</span> vs <span class="${w===2?'team-bold':''}">${m.t2p1} &amp; ${m.t2p2}</span>
         </div>
       </div>
       ${state.isAdmin?`<button class="btn btn-danger btn-sm" onclick="deleteMatch(${m._idx})">Eliminar</button>`:''}
@@ -545,210 +533,86 @@ function renderAdmin(){
     <div class="section-title">Añadir Partido</div>
     <div id="admin-alert" style="display:none"></div>
     <div class="card">
-      <div class="form-row" style="margin-bottom:12px">
-        <div class="form-group" style="margin:0"><label>Equipo 1 · Jugador A</label><select id="t1p1">${opts}</select></div>
-        <div class="form-group" style="margin:0"><label>Equipo 1 · Jugador B</label><select id="t1p2">${opts}</select></div>
-      </div>
-      <div class="form-row" style="margin-bottom:12px">
-        <div class="form-group" style="margin:0"><label>Equipo 2 · Jugador A</label><select id="t2p1">${opts}</select></div>
-        <div class="form-group" style="margin:0"><label>Equipo 2 · Jugador B</label><select id="t2p2">${opts}</select></div>
-      </div>
-      <div class="form-row" style="margin-bottom:12px">
-        <div class="form-group" style="margin:0"><label>Sets ganados Equipo 1</label><input type="number" id="s1" min="0" max="9" value="2"></div>
-        <div class="form-group" style="margin:0"><label>Sets ganados Equipo 2</label><input type="number" id="s2" min="0" max="9" value="1"></div>
-      </div>
-      <div class="form-group"><label>Marcador exacto (ej: 6-3 / 6-2)</label><input type="text" id="score-str" placeholder="6-3 / 6-2"></div>
-      <div class="form-row" style="margin-bottom:12px">
-        <div class="form-group" style="margin:0"><label>Ubicación</label><select id="location">${locOpts}</select></div>
-        <div class="form-group" style="margin:0"><label>Fecha</label><input type="date" id="mdate" value="${todayStr()}"></div>
-      </div>
-      <button class="btn btn-yellow" onclick="addMatch()" style="width:100%">Guardar partido</button>
+      <div class="form-row"><div class="form-group"><label>E1-A</label><select id="t1p1">${opts}</select></div><div class="form-group"><label>E1-B</label><select id="t1p2">${opts}</select></div></div>
+      <div class="form-row"><div class="form-group"><label>E2-A</label><select id="t2p1">${opts}</select></div><div class="form-group"><label>E2-B</label><select id="t2p2">${opts}</select></div></div>
+      <div class="form-row"><div class="form-group"><label>Sets E1</label><input type="number" id="s1" value="2"></div><div class="form-group"><label>Sets E2</label><input type="number" id="s2" value="1"></div></div>
+      <div class="form-group"><label>Marcador (6-3 / 6-2)</label><input type="text" id="score-str"></div>
+      <div class="form-row"><div class="form-group"><label>Lugar</label><select id="location">${locOpts}</select></div><div class="form-group"><label>Fecha</label><input type="date" id="mdate" value="${todayStr()}"></div></div>
+      <button class="btn btn-yellow" onclick="addMatch()" style="width:100%">Guardar</button>
     </div>
     <div class="divider"></div>
     <div class="section-title">Jugadores</div>
     <div class="card">
-      <div class="chips">${state.players.map(p=>`
-        <span class="chip">${p}<span class="chip-x" onclick="removePlayer('${esc(p)}')">✕</span></span>`).join('')}
-      </div>
-      <div style="display:flex;gap:8px">
-        <div style="flex:1"><input type="text" id="new-player" placeholder="Nombre completo" style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;width:100%;outline:none"></div>
-        <button class="btn btn-yellow" onclick="addPlayer()">Añadir</button>
-      </div>
+      <div class="chips">${state.players.map(p=>`<span class="chip">${p}<span class="chip-x" onclick="removePlayer('${esc(p)}')">✕</span></span>`).join('')}</div>
+      <div style="display:flex;gap:8px"><input type="text" id="new-player" style="flex:1" class="btn" style="text-align:left;color:white"><button class="btn btn-yellow" onclick="addPlayer()">Añadir</button></div>
     </div>`;
-  const selects=['t1p1','t1p2','t2p1','t2p2'];
-  selects.forEach((id,i)=>{ const e=document.getElementById(id); if(e&&state.players[i]) e.value=state.players[i]; });
 }
 
-// ── PERFIL MODAL (historial head to head) ───────────────
+// ── PERFIL MODAL ────────────────────────────────────────
 function showPerfilModal(playerName){
   const {ps}=calcStats();
   const s=ps[playerName]||{w:0,l:0,d:0,gw:0,gl:0};
-  const total=s.w+s.l+s.d;
+  const myMatches=state.matches.filter(m=>[m.t1p1,m.t1p2,m.t2p1,m.t2p2].includes(playerName)).sort((a,b)=>b.date.localeCompare(a.date));
 
-  // Partidos jugados por este jugador
-  const myMatches=state.matches
-    .filter(m=>[m.t1p1,m.t1p2,m.t2p1,m.t2p2].includes(playerName))
-    .sort((a,b)=>b.date.localeCompare(a.date));
-
-  // Head to head contra cada rival
   const h2h={};
   myMatches.forEach(m=>{
     const inT1=[m.t1p1,m.t1p2].includes(playerName);
-    const myTeam=inT1?[m.t1p1,m.t1p2]:[m.t2p1,m.t2p2];
-    const oppTeam=inT1?[m.t2p1,m.t2p2]:[m.t1p1,m.t1p2];
     const res=inT1?(m.s1>m.s2?'w':m.s1<m.s2?'l':'d'):(m.s2>m.s1?'w':m.s2<m.s1?'l':'d');
-    oppTeam.forEach(opp=>{
-      if(!h2h[opp]) h2h[opp]={w:0,l:0,d:0};
-      h2h[opp][res]++;
-    });
+    const oppTeam=inT1?[m.t2p1,m.t2p2]:[m.t1p1,m.t1p2];
+    oppTeam.forEach(opp=>{ if(!h2h[opp])h2h[opp]={w:0,l:0,d:0}; h2h[opp][res]++; });
   });
 
   const h2hRows=Object.entries(h2h).sort((a,b)=>(b[1].w+b[1].l+b[1].d)-(a[1].w+a[1].l+a[1].d)).map(([opp,r])=>`
-    <div class="h2h-row">
-      <div class="h2h-name">${opp}</div>
-      <div class="h2h-record">
-        <span class="rec-w">${r.w}V</span>
-        <span class="rec-e">${r.d}E</span>
-        <span class="rec-l">${r.l}D</span>
-      </div>
-    </div>`).join('');
-
-  // Lista de partidos
-  const matchRows=myMatches.map(m=>{
-    const inT1=[m.t1p1,m.t1p2].includes(playerName);
-    const res=inT1?(m.s1>m.s2?'w':m.s1<m.s2?'l':'d'):(m.s2>m.s1?'w':m.s2<m.s1?'l':'d');
-    const myTeam=inT1?`${m.t1p1} &amp; ${m.t1p2}`:`${m.t2p1} &amp; ${m.t2p2}`;
-    const oppTeam=inT1?`${m.t2p1} &amp; ${m.t2p2}`:`${m.t1p1} &amp; ${m.t1p2}`;
-    const displayScore=m.score||(m.s1+'-'+m.s2);
-    return`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <div style="color:var(--text3);font-size:10px;margin-bottom:2px">${formatDate(m.date)}${m.location?' · '+m.location:''}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="color:var(--text2)">${myTeam} <span style="color:var(--text3)">vs</span> ${oppTeam}</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px">
-          <span style="font-family:'Bebas Neue',sans-serif;font-size:16px">${displayScore}</span>
-          <span class="badge ${res==='w'?'badge-w':res==='l'?'badge-l':'badge-d'}">${res==='w'?'V':res==='l'?'D':'E'}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+    <div class="h2h-row"><div class="h2h-name">${opp}</div><div class="h2h-record"><span class="rec-w">${r.w}V</span> <span class="rec-e">${r.d}E</span> <span class="rec-l">${r.l}D</span></div></div>`).join('');
 
   document.getElementById('modal-perfil-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <div class="avatar avatar-md" style="border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;color:#fff;flex-shrink:0">${initials(playerName)}</div>
-      <div>
-        <div class="modal-title" style="margin-bottom:2px">${playerName}</div>
-        <div style="font-size:12px;color:var(--text3)">${total} partidos · <span class="rec-w">${s.w}V</span> <span class="rec-e">${s.d}E</span> <span class="rec-l">${s.l}D</span></div>
-      </div>
+      <div class="avatar avatar-md">${initials(playerName)}</div>
+      <div><div class="modal-title" style="margin-bottom:2px">${playerName}</div><div style="font-size:12px;color:var(--text3)">${s.w}V - ${s.d}E - ${s.l}D</div></div>
     </div>
-    <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Cara a cara</div>
-    <div style="margin-bottom:16px">${h2hRows||'<div style="color:var(--text3);font-size:12px">Sin datos</div>'}</div>
-    <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Partidos jugados</div>
-    <div>${matchRows||'<div style="color:var(--text3);font-size:12px">Sin partidos</div>'}</div>`;
-
+    <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Cara a cara</div>
+    <div style="margin-bottom:16px">${h2hRows||'Sin datos'}</div>
+    <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Partidos</div>
+    <div>${myMatches.length?myMatches.map(m=>{
+      const inT1=[m.t1p1,m.t1p2].includes(playerName);
+      const res=inT1?(m.s1>m.s2?'w':m.s1<m.s2?'l':'d'):(m.s2>m.s1?'w':m.s2<m.s1?'l':'d');
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;justify-content:space-between"><span>${formatDate(m.date)}</span><span>${m.score||(m.s1+'-'+m.s2)} <span class="badge ${res==='w'?'badge-w':res==='l'?'badge-l':'badge-d'}">${res.toUpperCase()}</span></span></div>`
+    }).join(''):'Sin partidos'}</div>`;
   document.getElementById('modal-perfil').classList.add('open');
 }
 
 // ── ACTIONS ─────────────────────────────────────────────
 async function addMatch(){
-  const t1p1=document.getElementById('t1p1').value;
-  const t1p2=document.getElementById('t1p2').value;
-  const t2p1=document.getElementById('t2p1').value;
-  const t2p2=document.getElementById('t2p2').value;
-  const s1=parseInt(document.getElementById('s1').value);
-  const s2=parseInt(document.getElementById('s2').value);
-  const date=document.getElementById('mdate').value;
-  const score=document.getElementById('score-str').value.trim();
+  const t1p1=document.getElementById('t1p1').value, t1p2=document.getElementById('t1p2').value;
+  const t2p1=document.getElementById('t2p1').value, t2p2=document.getElementById('t2p2').value;
+  const s1=parseInt(document.getElementById('s1').value), s2=parseInt(document.getElementById('s2').value);
+  const date=document.getElementById('mdate').value, score=document.getElementById('score-str').value.trim();
   const location=document.getElementById('location').value;
 
-  if(new Set([t1p1,t1p2,t2p1,t2p2]).size<4){showAdminAlert('Los cuatro jugadores deben ser distintos.','err');return;}
-  if(isNaN(s1)||isNaN(s2)){showAdminAlert('Introduce los sets correctamente.','err');return;}
+  if(new Set([t1p1,t1p2,t2p1,t2p2]).size<4){showAdminAlert('Jugadores repetidos','err');return;}
   state.matches.push({t1p1,t1p2,t2p1,t2p2,s1,s2,date,score,location});
   showAdminAlert('Guardando...','info');
   await saveToCloud();
-  showAdminAlert('¡Partido guardado correctamente!','ok');
+  showAdminAlert('¡Guardado!','ok');
   renderAdmin();
 }
 
-async function deleteMatch(idx){
-  if(!confirm('¿Eliminar este partido?')) return;
-  state.matches.splice(idx,1);
-  await saveToCloud();
-  renderHistorial();
-}
-
-async function addPlayer(){
-  const inp=document.getElementById('new-player');
-  const name=inp.value.trim();
-  if(!name||state.players.includes(name)) return;
-  state.players.push(name);
-  await saveToCloud();
-  renderAdmin();
-  inp.value='';
-}
-
-async function removePlayer(name){
-  if(!confirm('¿Eliminar a '+name+'?\nSus partidos seguirán en el historial.')) return;
-  state.players=state.players.filter(p=>p!==name);
-  await saveToCloud();
-  renderAdmin();
-}
-
+async function deleteMatch(idx){ if(confirm('¿Eliminar?')){ state.matches.splice(idx,1); await saveToCloud(); renderHistorial(); } }
+async function addPlayer(){ const inp=document.getElementById('new-player'); if(!inp.value.trim())return; state.players.push(inp.value.trim()); await saveToCloud(); renderAdmin(); }
+async function removePlayer(name){ if(confirm('¿Eliminar?')){ state.players=state.players.filter(p=>p!==name); await saveToCloud(); renderAdmin(); } }
 function selectUser(name){ state.currentUser=name; renderHome(); }
-
-function showLoginModal(){
-  document.getElementById('login-err').style.display='none';
-  document.getElementById('pass-input').value='';
-  document.getElementById('modal-login').classList.add('open');
-  setTimeout(()=>document.getElementById('pass-input').focus(),100);
-}
-
-function tryLogin(){
-  if(document.getElementById('pass-input').value===ADMIN_PASS){
-    state.isAdmin=true;
-    document.getElementById('admin-label').style.display='';
-    document.getElementById('admin-tab').style.display='';
-    document.getElementById('login-btn').style.display='none';
-    document.getElementById('logout-btn').style.display='';
-    closeModal('modal-login');
-  } else { document.getElementById('login-err').style.display=''; }
-}
-
-function doLogout(){
-  state.isAdmin=false;
-  document.getElementById('admin-label').style.display='none';
-  document.getElementById('admin-tab').style.display='none';
-  document.getElementById('login-btn').style.display='';
-  document.getElementById('logout-btn').style.display='none';
-  showTab('home',document.querySelector('.tab'));
-}
-
+function showLoginModal(){ document.getElementById('login-err').style.display='none'; document.getElementById('modal-login').classList.add('open'); }
+function tryLogin(){ if(document.getElementById('pass-input').value===ADMIN_PASS){ state.isAdmin=true; document.getElementById('admin-label').style.display=''; document.getElementById('admin-tab').style.display=''; document.getElementById('login-btn').style.display='none'; document.getElementById('logout-btn').style.display=''; closeModal('modal-login'); } else { document.getElementById('login-err').style.display=''; } }
+function doLogout(){ state.isAdmin=false; document.getElementById('admin-label').style.display='none'; document.getElementById('admin-tab').style.display='none'; document.getElementById('login-btn').style.display=''; document.getElementById('logout-btn').style.display='none'; showTab('home',document.querySelector('.tab')); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){ if(e.target===this) closeModal(this.id); }));
-
 function initials(name){ return name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 function todayStr(){ return new Date().toISOString().split('T')[0]; }
-function formatDate(str){
-  if(!str) return '';
-  const [y,m,d]=str.split('-');
-  const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  return parseInt(d)+' '+months[parseInt(m)-1]+' '+y;
-}
-function emptyState(msg){ return '<div class="empty"><div class="empty-icon">🎾</div>'+msg+'</div>'; }
-function showAdminAlert(msg,type){
-  const el=document.getElementById('admin-alert');
-  if(!el) return;
-  el.className='alert alert-'+type;
-  el.textContent=msg;
-  el.style.display='';
-}
-function esc(s){ return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
-
-async function init(){
-  document.getElementById('home-content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando datos...</div>';
-  await loadFromCloud();
-  renderHome();
-}
+function formatDate(str){ if(!str)return ''; const [y,m,d]=str.split('-'); return parseInt(d)+'/'+parseInt(m); }
+function emptyState(msg){ return '<div class="empty">'+msg+'</div>'; }
+function showAdminAlert(msg,type){ const el=document.getElementById('admin-alert'); el.className='alert alert-'+type; el.textContent=msg; el.style.display=''; }
+function esc(s){ return s.replace(/'/g,"\\'").replace(/\"/g,'&quot;'); }
+async function init(){ await loadFromCloud(); renderHome(); }
 init();
 </script>
 </body>
